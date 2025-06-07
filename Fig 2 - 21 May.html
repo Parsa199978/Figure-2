@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Publication Year Bar Chart</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            background-color: #f3f4f6; /* Tailwind gray-100 */
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .chart-container {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.75rem; /* Tailwind rounded-xl */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* Tailwind shadow-lg */
+            width: 100%;
+            max-width: 900px;
+            margin-top: 1rem;
+        }
+        h1 {
+            font-size: 1.875rem; /* Tailwind text-3xl */
+            font-weight: 600; /* Tailwind font-semibold */
+            color: #1f2937; /* Tailwind gray-800 */
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        #controlsContainer {
+            background-color: white;
+            padding: 1rem;
+            border-radius: 0.5rem; /* Tailwind rounded-lg */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);/* Tailwind shadow-md */
+            margin-bottom: 1.5rem;
+            display: flex;
+            gap: 0.75rem; 
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap; 
+        }
+        #controlsContainer label, #controlsContainer select, #controlsContainer button {
+            font-size: 0.875rem; /* Tailwind text-sm */
+        }
+        #controlsContainer select, #controlsContainer button {
+            padding: 0.5rem 1rem;
+            border-radius: 0.375rem; /* Tailwind rounded-md */
+            border: 1px solid #d1d5db; /* Tailwind border-gray-300 */
+            white-space: nowrap; 
+        }
+        #controlsContainer button { /* General style for buttons in controls */
+            background-color: #4f46e5; /* Tailwind indigo-600 */
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        #controlsContainer button:hover { /* General hover for buttons in controls */
+            background-color: #4338ca; /* Tailwind indigo-700 */
+        }
+        /* Specific style for Download button */
+        #download4kJpegButton { /* ID remains the same, but text changes */
+            background-color: #0ea5e9; /* Tailwind sky-500 */
+        }
+        #download4kJpegButton:hover {
+            background-color: #0284c7; /* Tailwind sky-600 */
+        }
+        canvas {
+            width: 100% !important;
+            height: auto !important;
+            max-height: 500px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Publication Trends</h1>
+
+    <div id="controlsContainer">
+        <label for="sortOrder">Sort by:</label>
+        <select id="sortOrder" class="rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50">
+            <option value="year_asc">Year (Ascending)</option>
+            <option value="year_desc">Year (Descending)</option>
+            <option value="count_asc">Number of Articles (Ascending)</option>
+            <option value="count_desc">Number of Articles (Descending)</option>
+        </select>
+        <button id="applySort" class="font-medium">Apply Sort</button>
+        <button id="download4kJpegButton" class="font-medium">Download</button>
+    </div>
+
+    <div class="chart-container">
+        <canvas id="publicationChart"></canvas>
+    </div>
+
+    <script>
+        // Raw data - Updated with the content from "Fig 3 Data - 21 May.docx"
+        const rawYearsString = `
+            1996 2011 2023 2022 2019 2011 2013 2016 2019 2003 2021 2020 2020 2022 2016 2012 2011 2011 2020 2020 2014 2019 1980 2019 1986 2015 2019 2022 2016 2018 2021 2023 2023 2019 2020 2016 2020 2018 2022 2023 2020 2018 2022 2020 2020 2012 2022 2013 2010 2011 2010 2010 2008 2017 2016 2022 2023 2020 2023 2012 2001 2008 2018 2001 2001 2011 2021 2020 2021 2022 2013 2022 2020 2011 2011 2021 2022 2015 1998 1997 2001 2023 2023 2010 2017 2011 2018 2011 1997 1995 2022 2019 2023 2019 2021 2020 2002 2013 2009 2011 1999 2000 2008 2000 2004 2013 2004 2010 2022 2019 2023 2000 2020 2018 2019 2023 2010 2023 2004 1982 1993 2014 2011 2006 2008 2005 2006 2015 2016 2007 2007 2019 1984 2006 2010 2018 2001 2016 2011 2013 2014 2010 2021 2010 2013 2022 2016 1998 2004 2005 2001 2016 2006 2002 2023 2007 2017 2011 2012 2008 2020 1987 2001 2006 2007 2001 2000 2006 2000 1997 2016 2021 2017 2006 2014 2012 2001 2006 2021 2012 2019 2002 2021 2012 1999 2016 2013 2008 2011 2021 2013 2018 2023 2011 2014 2007 2019 2007 2012 2010 2005 2000 2004 2010 2012 2001 2019 2001 2010 2003 2012 2012 2003 2012 2019 2006 2007 2005 1982 2006 2007 1987 2020 2006 2017 2020
+        `;
+
+        // Process the raw data: clean up, split into an array, and convert to numbers.
+        const yearsArray = rawYearsString.trim().split(/\s+/).map(Number).filter(year => !isNaN(year));
+
+        // Count frequencies of each year from the input data
+        const actualYearCounts = {};
+        yearsArray.forEach(year => { actualYearCounts[year] = (actualYearCounts[year] || 0) + 1; });
+
+        let chartInstance = null; // Holds the instance of the on-screen chart
+
+        // Plugin for background color (essential for JPEG export)
+        const customCanvasBackgroundColorPlugin = {
+            id: 'customCanvasBackgroundColor',
+            beforeDraw: (chart, args, options) => {
+                const { ctx } = chart;
+                ctx.save();
+                ctx.globalCompositeOperation = 'destination-over'; // Draw behind existing content
+                ctx.fillStyle = options.color || '#ffffff'; // Default to white if no color specified
+                ctx.fillRect(0, 0, chart.width, chart.height);
+                ctx.restore();
+            }
+        };
+        Chart.register(customCanvasBackgroundColorPlugin); // Register plugin globally to be used by all charts
+
+        // Function to render the on-screen chart
+        function renderChart(sortOrder = 'year_asc') {
+            // Data processing logic (determine min/max year, count occurrences, sort)
+            let minYearInDataset, maxYearInDataset;
+            if (yearsArray.length > 0) {
+                minYearInDataset = Math.min(...yearsArray);
+                maxYearInDataset = Math.max(...yearsArray);
+            } else {
+                const currentYear = new Date().getFullYear();
+                minYearInDataset = currentYear; maxYearInDataset = currentYear;
+            }
+            const allYearCountsInRange = {};
+            for (let y = minYearInDataset; y <= maxYearInDataset; y++) {
+                allYearCountsInRange[y] = actualYearCounts[y] || 0;
+            }
+            let dataForChart = Object.entries(allYearCountsInRange).map(([year, count]) => ({ year: parseInt(year), count }));
+            // Sorting based on user selection
+            switch (sortOrder) {
+                case 'year_asc': dataForChart.sort((a, b) => a.year - b.year); break;
+                case 'year_desc': dataForChart.sort((a, b) => b.year - a.year); break;
+                case 'count_asc': dataForChart.sort((a, b) => a.count - b.count || a.year - b.year); break;
+                case 'count_desc': dataForChart.sort((a, b) => b.count - a.count || a.year - b.year); break;
+            }
+            const labels = dataForChart.map(item => item.year.toString());
+            const dataValues = dataForChart.map(item => item.count);
+
+            const ctx = document.getElementById('publicationChart').getContext('2d');
+            if (chartInstance) { chartInstance.destroy(); } // Destroy previous instance if exists
+
+            // Configuration for the on-screen chart
+            chartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: { labels, datasets: [{ label: 'Number of Published Articles', data: dataValues, backgroundColor: 'rgba(79, 70, 229, 0.8)', borderColor: 'rgba(79, 70, 229, 1)', borderWidth: 1, borderRadius: 5, hoverBackgroundColor: 'rgba(67, 56, 202, 1)' }] },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    devicePixelRatio: window.devicePixelRatio || 1, // For sharp on-screen rendering
+                    scales: {
+                        y: { beginAtZero: true, title: { display: true, text: 'Number of Published Articles', font: { size: 14, weight: '500' }, color: '#374151' }, ticks: { color: '#4b5563', precision: 0 }, grid: { color: '#e5e7eb' } },
+                        x: { title: { display: true, text: 'Year', font: { size: 14, weight: '500' }, color: '#374151' }, ticks: { color: '#4b5563', maxRotation: 45, minRotation: 0, autoSkip: true, maxTicksLimit: 40 }, grid: { display: false } }
+                    },
+                    plugins: {
+                        legend: { 
+                            display: false // Hide the legend for the on-screen chart
+                        },
+                        tooltip: { backgroundColor: '#1f2937', titleColor: '#ffffff', bodyColor: '#ffffff', callbacks: { label: context => `${context.dataset.label || ''}: ${context.parsed.y || ''}` } },
+                        customCanvasBackgroundColor: { color: 'white' } // Ensure background for on-screen chart
+                    }
+                }
+            });
+        }
+
+        renderChart(); // Initial render of the on-screen chart
+
+        // Event listener for the sort button
+        document.getElementById('applySort').addEventListener('click', () => {
+            renderChart(document.getElementById('sortOrder').value);
+        });
+
+        // Event listener for 4K JPEG download (now just "Download")
+        document.getElementById('download4kJpegButton').addEventListener('click', () => {
+            if (!chartInstance) {
+                console.error("Original chart instance not available for download.");
+                alert("Chart not ready. Please try again.");
+                return;
+            }
+
+            const currentCanvas = chartInstance.canvas;
+            const aspectRatio = currentCanvas.width / currentCanvas.height;
+            const targetWidth = 3840; // 4K width
+            const targetHeight = Math.round(targetWidth / aspectRatio);
+
+            // Create a temporary off-screen canvas
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = targetWidth;
+            tempCanvas.height = targetHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+
+            // Deep clone original options and modify for hi-res export
+            // A simple way to deep clone config for Chart.js (be mindful of functions if any are complex)
+            const tempChartOptions = JSON.parse(JSON.stringify(chartInstance.config.options));
+
+            tempChartOptions.responsive = false; // Not responsive for fixed size export
+            tempChartOptions.maintainAspectRatio = false; // We've set specific dimensions
+            tempChartOptions.animation = false; // No animation for faster rendering
+            tempChartOptions.devicePixelRatio = 1; // Render at native resolution for the temp canvas
+
+            // --- Apply font size adjustments for 4K export ---
+            const scaleFactor = 2.5; // Adjust this factor as needed for font legibility
+            
+            // Y-axis title
+            if (tempChartOptions.scales.y && tempChartOptions.scales.y.title && tempChartOptions.scales.y.title.font) {
+                tempChartOptions.scales.y.title.font.size = Math.round((tempChartOptions.scales.y.title.font.size || 14) * scaleFactor);
+            }
+            // Y-axis ticks
+            if (tempChartOptions.scales.y && tempChartOptions.scales.y.ticks && tempChartOptions.scales.y.ticks.font) {
+                tempChartOptions.scales.y.ticks.font.size = Math.round((tempChartOptions.scales.y.ticks.font.size || 12) * scaleFactor);
+            } else if (tempChartOptions.scales.y && tempChartOptions.scales.y.ticks) { // If font object doesn't exist
+                 tempChartOptions.scales.y.ticks.font = { size: Math.round(12 * scaleFactor) };
+            }
+
+            // X-axis title
+            if (tempChartOptions.scales.x && tempChartOptions.scales.x.title && tempChartOptions.scales.x.title.font) {
+                tempChartOptions.scales.x.title.font.size = Math.round((tempChartOptions.scales.x.title.font.size || 14) * scaleFactor);
+            }
+            // X-axis ticks
+            if (tempChartOptions.scales.x && tempChartOptions.scales.x.ticks && tempChartOptions.scales.x.ticks.font) {
+                tempChartOptions.scales.x.ticks.font.size = Math.round((tempChartOptions.scales.x.ticks.font.size || 12) * scaleFactor);
+            } else if (tempChartOptions.scales.x && tempChartOptions.scales.x.ticks) { // If font object doesn't exist
+                 tempChartOptions.scales.x.ticks.font = { size: Math.round(12 * scaleFactor) };
+            }
+
+            // Legend - ensure it's hidden for 4K export as well
+            if (tempChartOptions.plugins && tempChartOptions.plugins.legend) {
+                tempChartOptions.plugins.legend.display = false;
+            } else if (tempChartOptions.plugins) {
+                tempChartOptions.plugins.legend = { display: false };
+            } else {
+                tempChartOptions.plugins = { legend: { display: false } };
+            }
+            
+            // Ensure the background color plugin is configured for the temporary chart
+            if (!tempChartOptions.plugins) tempChartOptions.plugins = {}; 
+            tempChartOptions.plugins.customCanvasBackgroundColor = { color: 'white' };
+
+            let tempChart = null;
+            try {
+                // Create a new temporary chart instance on the off-screen canvas
+                tempChart = new Chart(tempCtx, {
+                    type: chartInstance.config.type, // Use original chart type
+                    data: JSON.parse(JSON.stringify(chartInstance.config.data)), // Use a copy of original data
+                    options: tempChartOptions // Use the modified options for 4K
+                });
+
+                // Get data URL from the temporary canvas
+                const dataUrl = tempCanvas.toDataURL('image/jpeg', 0.95); // 95% quality for 4K
+
+                // Trigger download
+                const imageLink = document.createElement('a');
+                imageLink.href = dataUrl;
+                imageLink.download = 'publication_trends_chart_4K_no_legend.jpeg'; 
+                document.body.appendChild(imageLink); // Required for Firefox
+                imageLink.click();
+                document.body.removeChild(imageLink); // Clean up the link
+
+            } catch (error) {
+                console.error("Error creating or exporting 4K chart:", error);
+                alert("Failed to generate 4K image. Please check console for errors.");
+            } finally {
+                // Clean up the temporary chart instance
+                if (tempChart) {
+                    tempChart.destroy(); 
+                }
+            }
+        });
+    </script>
+</body>
+</html>
